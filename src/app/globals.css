@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f7f5;
+  --card: #ffffff;
+  --card-muted: #f0f2ef;
+  --fg: #16201b;
+  --muted: #5d6b64;
+  --border: #dfe4e0;
+  --accent: #0f7a5a;
+  --accent-fg: #ffffff;
+  --accent-soft: #e3f3ec;
+  --warn: #9a5b00;
+  --warn-soft: #fdf1dc;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --track: #e6ebe7;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1412;
+    --card: #171e1b;
+    --card-muted: #1d2622;
+    --fg: #e8eeea;
+    --muted: #9aa9a1;
+    --border: #2a3530;
+    --accent: #3fbf8f;
+    --accent-fg: #07130e;
+    --accent-soft: #163428;
+    --warn: #f0b458;
+    --warn-soft: #3a2a10;
+    --danger: #f97066;
+    --danger-soft: #3d1a17;
+    --track: #26312c;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-card-muted: var(--card-muted);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-track: var(--track);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
