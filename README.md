@@ -61,7 +61,7 @@ npm run dev                   # http://localhost:3000
 | --- | --- |
 | `MONGODB_URI` | MongoDB connection string, including the database name |
 | `JWT_SECRET` | 32+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `NEXT_PUBLIC_APP_URL` | Base URL used in invitation links, e.g. `http://localhost:3000` |
+| `NEXT_APP_URL` | Base URL used in invitation links, e.g. `http://localhost:3000` |
 
 **Database options for development:**
 
@@ -113,8 +113,8 @@ Indexes, including the unique ones that enforce data integrity, are created auto
 3. Add environment variables for Production, and Preview if you use it:
    - `MONGODB_URI`: the Atlas string from above
    - `JWT_SECRET`: a newly generated random value (never reuse your development secret)
-   - `NEXT_PUBLIC_APP_URL`: `https://<your-project>.vercel.app`
-4. Deploy. If you set `NEXT_PUBLIC_APP_URL` after the first deploy, redeploy, because it's embedded at build time.
+   - `NEXT_APP_URL`: `https://<your-project>.vercel.app`
+4. Deploy. If you set `NEXT_APP_URL` after the first deploy, redeploy, because it's embedded at build time.
 
 ### 3. Verify production
 

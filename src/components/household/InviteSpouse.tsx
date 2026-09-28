@@ -23,7 +23,7 @@ export function InviteSpouse() {
         return;
       }
       // Prefer the configured public URL; fall back to wherever the app is running.
-      const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const base = process.env.NEXT_APP_URL || window.location.origin;
       setLink({ url: `${base.replace(/\/$/, "")}/invite/${res.data.token}`, expiresAt: res.data.expiresAt });
       setMessage(null);
     });
