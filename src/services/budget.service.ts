@@ -1,13 +1,14 @@
 import { Types } from "mongoose";
-import { summarizeCategory, summarizeMonth, type CategorySummary, type MonthTotals } from "@/lib/budget-math";
+import { summarizeAllotment, summarizeMonth, type AllotmentSummary, type MonthTotals } from "@/lib/budget-math";
 import { formatMonthLabel, isValidMonth } from "@/lib/dates";
 import { AppError, isDuplicateKeyError } from "@/lib/errors";
 import { budgetSchema, fieldErrorsOf, type BudgetInput } from "@/lib/validation";
+import { Allotment, type AllotmentDoc } from "@/models/Allotment";
 import { Budget, type BudgetDoc } from "@/models/Budget";
 import { BudgetAllocation } from "@/models/BudgetAllocation";
-import { Category, type CategoryDoc } from "@/models/Category";
+import { Income } from "@/models/Income";
 import { Transaction } from "@/models/Transaction";
-import { toCategoryInfo, type CategoryInfo } from "./category.service";
+import { toAllotmentInfo, type AllotmentInfo } from "./allotment.service";
 import { requireMembership, type HouseholdInfo } from "./household.service";
 
 /** Returns the household's budget for a month, creating an empty one if needed. */
@@ -15,7 +16,7 @@ export async function ensureBudget(householdId: Types.ObjectId, month: string): 
   const upsert = () =>
     Budget.findOneAndUpdate(
       { householdId, month },
-      { $setOnInsert: { householdId, month, totalIncome: 0 } },
+      { $setOnInsert: { householdId, month } },
       { upsert: true, returnDocument: "after" },
     ).lean<BudgetDoc>();
   try {
@@ -27,102 +28,113 @@ export async function ensureBudget(householdId: Types.ObjectId, month: string): 
   }
 }
 
-/** Sum of transaction amounts per category for one budget. */
-export async function spentByCategory(
+/** Sum of expenses per allotment for one budget. */
+export async function spentByAllotment(
   householdId: Types.ObjectId,
   budgetId: Types.ObjectId,
 ): Promise<Map<string, number>> {
   const rows = await Transaction.aggregate<{ _id: Types.ObjectId; spent: number }>([
     { $match: { householdId, budgetId } },
-    { $group: { _id: "$categoryId", spent: { $sum: "$amount" } } },
+    { $group: { _id: "$allotmentId", spent: { $sum: "$amount" } } },
   ]);
   return new Map(rows.map((r) => [r._id.toString(), r.spent]));
 }
 
-export type CategoryRow = CategoryInfo & CategorySummary;
+/** `inBudget`: the allotment was given an amount (possibly 0) in this month's budget. */
+export type AllotmentRow = AllotmentInfo & AllotmentSummary & { inBudget: boolean };
 
 export type MonthOverview = {
   household: HouseholdInfo;
   month: string;
   hasBudget: boolean;
   totals: MonthTotals;
-  categories: CategoryRow[];
+  allotments: AllotmentRow[];
 };
 
 export async function getMonthOverview(userId: string, month: string): Promise<MonthOverview> {
   const { household, householdId } = await requireMembership(userId);
   if (!isValidMonth(month)) throw new AppError("Please choose a valid month.");
 
-  const [budget, categories] = await Promise.all([
+  const [budget, allotments] = await Promise.all([
     Budget.findOne({ householdId, month }).lean<BudgetDoc>(),
-    Category.find({ householdId }).sort({ sortOrder: 1, createdAt: 1 }).lean<CategoryDoc[]>(),
+    Allotment.find({ householdId }).sort({ sortOrder: 1, createdAt: 1 }).lean<AllotmentDoc[]>(),
   ]);
 
   const allocations = new Map<string, number>();
   let spent = new Map<string, number>();
+  let incomes: number[] = [];
   if (budget) {
-    const [allocationDocs, spentMap] = await Promise.all([
+    const [allocationDocs, spentMap, incomeDocs] = await Promise.all([
       BudgetAllocation.find({ householdId, budgetId: budget._id }).lean(),
-      spentByCategory(householdId, budget._id),
+      spentByAllotment(householdId, budget._id),
+      Income.find({ householdId, budgetId: budget._id }).select("amount").lean(),
     ]);
-    for (const a of allocationDocs) allocations.set(a.categoryId.toString(), a.allocatedAmount);
+    for (const a of allocationDocs) allocations.set(a.allotmentId.toString(), a.allocatedAmount);
     spent = spentMap;
+    incomes = incomeDocs.map((i) => i.amount);
   }
 
-  const rows: CategoryRow[] = categories
-    .map((c) => {
-      const id = c._id.toString();
-      return { ...toCategoryInfo(c), ...summarizeCategory(allocations.get(id) ?? 0, spent.get(id) ?? 0) };
+  const rows: AllotmentRow[] = allotments
+    .map((a) => {
+      const id = a._id.toString();
+      return {
+        ...toAllotmentInfo(a),
+        ...summarizeAllotment(allocations.get(id) ?? 0, spent.get(id) ?? 0),
+        inBudget: allocations.has(id),
+      };
     })
-    // Archived categories only appear in months where they hold money or spending.
-    .filter((row) => !row.isArchived || row.allocated > 0 || row.spent > 0);
+    // Archived allotments only appear in months where they are budgeted or have spending.
+    .filter((row) => !row.isArchived || row.inBudget || row.spent > 0);
 
   return {
     household,
     month,
     hasBudget: budget !== null,
-    totals: summarizeMonth(budget?.totalIncome ?? 0, [...allocations.values()], [...spent.values()]),
-    categories: rows,
+    totals: summarizeMonth(incomes, [...allocations.values()], [...spent.values()]),
+    allotments: rows,
   };
 }
 
-export async function getCategorySummary(
+export async function getAllotmentSummary(
   householdId: Types.ObjectId,
   budgetId: Types.ObjectId,
-  categoryId: Types.ObjectId,
-): Promise<CategorySummary> {
+  allotmentId: Types.ObjectId,
+): Promise<AllotmentSummary> {
   const [allocation, spentRows] = await Promise.all([
-    BudgetAllocation.findOne({ householdId, budgetId, categoryId }).lean(),
+    BudgetAllocation.findOne({ householdId, budgetId, allotmentId }).lean(),
     Transaction.aggregate<{ spent: number }>([
-      { $match: { householdId, budgetId, categoryId } },
+      { $match: { householdId, budgetId, allotmentId } },
       { $group: { _id: null, spent: { $sum: "$amount" } } },
     ]),
   ]);
-  return summarizeCategory(allocation?.allocatedAmount ?? 0, spentRows[0]?.spent ?? 0);
+  return summarizeAllotment(allocation?.allocatedAmount ?? 0, spentRows[0]?.spent ?? 0);
 }
 
+/** Saves the complete set of allotted amounts for a month. */
 export async function saveBudget(userId: string, input: BudgetInput): Promise<void> {
   const { householdId } = await requireMembership(userId);
   const parsed = budgetSchema.safeParse(input);
   if (!parsed.success) throw new AppError("Please enter valid amounts.", fieldErrorsOf(parsed.error));
-  const { month, totalIncome, allocations } = parsed.data;
+  const { month, allocations } = parsed.data;
 
-  // Every category must belong to this household.
-  const categoryIds = [...new Set(allocations.map((a) => a.categoryId))];
-  const owned = await Category.countDocuments({ _id: { $in: categoryIds }, householdId });
-  if (owned !== categoryIds.length) throw new AppError("This category no longer exists.");
+  // Every allotment must belong to this household.
+  const allotmentIds = [...new Set(allocations.map((a) => a.allotmentId))];
+  const owned = await Allotment.countDocuments({ _id: { $in: allotmentIds }, householdId });
+  if (owned !== allotmentIds.length) throw new AppError("This allotment no longer exists.");
 
   const budget = await ensureBudget(householdId, month);
-  await Budget.updateOne({ _id: budget._id, householdId }, { $set: { totalIncome } });
+  // The submitted list is the month's full plan: allotments left out are removed from it.
+  await BudgetAllocation.deleteMany({
+    householdId,
+    budgetId: budget._id,
+    allotmentId: { $nin: allotmentIds.map((id) => new Types.ObjectId(id)) },
+  });
   if (allocations.length > 0) {
     await BudgetAllocation.bulkWrite(
       allocations.map((a) => ({
         updateOne: {
-          filter: { budgetId: budget._id, categoryId: new Types.ObjectId(a.categoryId) },
-          update: {
-            $set: { allocatedAmount: a.allocatedAmount },
-            $setOnInsert: { householdId },
-          },
+          filter: { budgetId: budget._id, allotmentId: new Types.ObjectId(a.allotmentId) },
+          update: { $set: { allocatedAmount: a.allocatedAmount }, $setOnInsert: { householdId } },
           upsert: true,
         },
       })),
@@ -130,44 +142,45 @@ export async function saveBudget(userId: string, input: BudgetInput): Promise<vo
   }
 }
 
-/**
- * Copies income and allocations (for categories that are still active) from the
- * most recent earlier budget. No rollover of unspent money happens here.
- */
-export type CopiedBudget = { fromMonth: string; totalIncome: number; allocations: Record<string, number> };
+export type CopiedBudget = { fromMonth: string; allocations: Record<string, number> };
 
+/** The most recent budget before `month` that allotted any money. */
+async function previousBudget(householdId: Types.ObjectId, month: string) {
+  const budgetIds = await BudgetAllocation.distinct("budgetId", { householdId });
+  return Budget.findOne({ householdId, month: { $lt: month }, _id: { $in: budgetIds } })
+    .sort({ month: -1 })
+    .lean<BudgetDoc>();
+}
+
+/**
+ * Copies allotted amounts (for allotments that are still active) from the most
+ * recent earlier budget. Income entries are actual receipts, so they are not
+ * copied, and unspent money does not roll over.
+ */
 export async function copyPreviousBudget(userId: string, month: string): Promise<CopiedBudget> {
   const { householdId } = await requireMembership(userId);
   if (!isValidMonth(month)) throw new AppError("Please choose a valid month.");
 
-  const previous = await Budget.findOne({ householdId, month: { $lt: month } })
-    .sort({ month: -1 })
-    .lean<BudgetDoc>();
+  const previous = await previousBudget(householdId, month);
   if (!previous) throw new AppError(`There's no budget before ${formatMonthLabel(month)} to copy from.`);
 
-  const [allocations, activeCategories] = await Promise.all([
+  const [allocations, active] = await Promise.all([
     BudgetAllocation.find({ householdId, budgetId: previous._id }).lean(),
-    Category.find({ householdId, isArchived: false }).select("_id").lean(),
+    Allotment.find({ householdId, isArchived: false }).select("_id").lean(),
   ]);
-  const active = new Set(activeCategories.map((c) => c._id.toString()));
-
+  const activeIds = new Set(active.map((a) => a._id.toString()));
   const copied = allocations
-    .filter((a) => active.has(a.categoryId.toString()))
-    .map((a) => ({ categoryId: a.categoryId.toString(), allocatedAmount: a.allocatedAmount }));
-  await saveBudget(userId, { month, totalIncome: previous.totalIncome, allocations: copied });
+    .filter((a) => activeIds.has(a.allotmentId.toString()))
+    .map((a) => ({ allotmentId: a.allotmentId.toString(), allocatedAmount: a.allocatedAmount }));
+  await saveBudget(userId, { month, allocations: copied });
   return {
     fromMonth: previous.month,
-    totalIncome: previous.totalIncome,
-    allocations: Object.fromEntries(copied.map((a) => [a.categoryId, a.allocatedAmount])),
+    allocations: Object.fromEntries(copied.map((a) => [a.allotmentId, a.allocatedAmount])),
   };
 }
 
-/** The most recent month before `month` that has a budget, if any. */
+/** The most recent month before `month` with allotted amounts to copy, if any. */
 export async function previousBudgetMonth(userId: string, month: string): Promise<string | null> {
   const { householdId } = await requireMembership(userId);
-  const previous = await Budget.findOne({ householdId, month: { $lt: month } })
-    .sort({ month: -1 })
-    .select("month")
-    .lean();
-  return previous?.month ?? null;
+  return (await previousBudget(householdId, month))?.month ?? null;
 }

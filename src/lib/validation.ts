@@ -17,7 +17,7 @@ const wholeAmount = (opts: { min: number; emptyAsZero?: boolean }) =>
 
 /** Expense amounts: whole number, at least 1. */
 export const amountSchema = wholeAmount({ min: 1 });
-/** Income/allocations: whole number, 0 allowed, blank means 0. */
+/** Allotted amounts: whole number, 0 allowed, blank means 0. */
 export const budgetAmountSchema = wholeAmount({ min: 0, emptyAsZero: true });
 
 export const monthSchema = z.string().refine(isValidMonth, "Please choose a valid month.");
@@ -65,7 +65,7 @@ export const householdNameSchema = z
 
 export const createHouseholdSchema = z.object({
   name: householdNameSchema,
-  useDefaultCategories: z.boolean(),
+  useDefaultAllotments: z.boolean(),
 });
 
 export const householdSettingsSchema = z.object({
@@ -78,25 +78,27 @@ export const householdSettingsSchema = z.object({
   timezone: z.string().refine(isValidTimeZone, "Please choose a valid timezone."),
 });
 
-export const CATEGORY_TYPES = ["EXPENSE", "SAVING"] as const;
-
-export const categorySchema = z.object({
-  name: z.string().trim().min(1, "Please enter a category name.").max(40, "Category name is too long."),
-  type: z.enum(CATEGORY_TYPES),
-  icon: z.string().trim().max(8, "Icon is too long.").default(""),
+export const allotmentSchema = z.object({
+  name: z.string().trim().min(1, "Please enter an allotment name.").max(40, "Allotment name is too long."),
 });
 
 export const budgetSchema = z.object({
   month: monthSchema,
-  totalIncome: budgetAmountSchema,
   allocations: z
-    .array(z.object({ categoryId: objectIdSchema, allocatedAmount: budgetAmountSchema }))
+    .array(z.object({ allotmentId: objectIdSchema, allocatedAmount: budgetAmountSchema }))
     .max(200),
+});
+
+export const incomeSchema = z.object({
+  amount: amountSchema,
+  source: z.string().trim().max(60, "Source is too long.").default(""),
+  receivedByUserId: objectIdSchema,
+  receivedDate: dateSchema,
 });
 
 export const transactionSchema = z.object({
   amount: amountSchema,
-  categoryId: objectIdSchema.or(z.literal("")).refine((v) => v !== "", "Please choose a category."),
+  allotmentId: objectIdSchema.or(z.literal("")).refine((v) => v !== "", "Please choose an allotment."),
   description: z.string().trim().max(140, "Description is too long.").default(""),
   paidByUserId: objectIdSchema,
   transactionDate: dateSchema,
@@ -104,7 +106,7 @@ export const transactionSchema = z.object({
 
 export const transactionFiltersSchema = z.object({
   month: monthSchema,
-  categoryId: objectIdSchema.optional(),
+  allotmentId: objectIdSchema.optional(),
   paidByUserId: objectIdSchema.optional(),
   date: dateSchema.optional(),
   q: z.string().trim().max(100).optional(),
@@ -117,7 +119,8 @@ export const invitationTokenSchema = z
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type TransactionInput = z.input<typeof transactionSchema>;
 export type BudgetInput = z.input<typeof budgetSchema>;
-export type CategoryInput = z.input<typeof categorySchema>;
+export type AllotmentInput = z.input<typeof allotmentSchema>;
+export type IncomeInput = z.input<typeof incomeSchema>;
 export type TransactionFilters = z.input<typeof transactionFiltersSchema>;
 
 export function fieldErrorsOf(error: z.ZodError): Record<string, string[]> {

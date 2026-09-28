@@ -8,16 +8,16 @@ import { buttonClass } from "@/components/ui/styles";
 import { useServerForm } from "@/components/ui/useServerForm";
 import { monthOf } from "@/lib/dates";
 import type { TransactionView } from "@/services/transaction.service";
-import { TransactionFields, type CategoryOption, type MemberOption } from "./TransactionFields";
+import { TransactionFields, type AllotmentOption, type MemberOption } from "./TransactionFields";
 
 export function EditTransactionForm({
   transaction,
-  categories,
+  allotments,
   members,
   currency,
 }: {
   transaction: TransactionView;
-  categories: CategoryOption[];
+  allotments: AllotmentOption[];
   members: MemberOption[];
   currency: string;
 }) {
@@ -31,7 +31,7 @@ export function EditTransactionForm({
   );
 
   function onDelete() {
-    if (!window.confirm("Delete this expense? The amount goes back to its category.")) return;
+    if (!window.confirm("Delete this expense? The amount goes back to its allotment.")) return;
     startDelete(async () => {
       const res = await deleteTransactionAction(transaction.id);
       if (res.ok) router.push(`/transactions?m=${monthOf(transaction.transactionDate)}`);
@@ -47,13 +47,13 @@ export function EditTransactionForm({
       {deleteError && <Alert>{deleteError}</Alert>}
       <TransactionFields
         idPrefix="edit"
-        categories={categories}
+        allotments={allotments}
         members={members}
         currency={currency}
         fieldErrors={fieldErrors}
         defaults={{
           amount: transaction.amount,
-          categoryId: transaction.categoryId,
+          allotmentId: transaction.allotmentId,
           description: transaction.description,
           paidByUserId: transaction.paidByUserId,
           transactionDate: transaction.transactionDate,

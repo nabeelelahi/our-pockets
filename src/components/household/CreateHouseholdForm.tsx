@@ -18,9 +18,9 @@ export function CreateHouseholdForm({ defaultName }: { defaultName: string }) {
         <input {...fieldAria("name", fieldErrors.name)} name="name" defaultValue={defaultName} required className={inputClass} />
       </Field>
       <label className="flex items-start gap-3 rounded-xl bg-card-muted p-3 text-sm">
-        <input type="checkbox" name="useDefaultCategories" defaultChecked className="mt-0.5 h-5 w-5 accent-[var(--accent)]" />
+        <input type="checkbox" name="useDefaultAllotments" defaultChecked className="mt-0.5 h-5 w-5 accent-[var(--accent)]" />
         <span>
-          <span className="font-medium">Start with suggested categories</span>
+          <span className="font-medium">Start with suggested allotments</span>
           <span className="block text-muted">
             Household, Food &amp; Groceries, Transport, Bills, Personal, Entertainment, Medical, Savings, Miscellaneous.
             You can rename or remove them later.

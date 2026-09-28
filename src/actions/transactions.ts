@@ -13,7 +13,7 @@ import {
 function transactionInput(formData: FormData) {
   return {
     amount: formString(formData, "amount"),
-    categoryId: formString(formData, "categoryId"),
+    allotmentId: formString(formData, "allotmentId"),
     description: formString(formData, "description"),
     paidByUserId: formString(formData, "paidByUserId"),
     transactionDate: formString(formData, "transactionDate"),

@@ -3,25 +3,25 @@ import type { ComponentProps } from "react";
 import type { AddExpense } from "@/components/transactions/AddExpense";
 import { todayInTimeZone } from "@/lib/dates";
 import type { PublicUser } from "@/services/auth.service";
-import { listCategories } from "@/services/category.service";
+import { listAllotments } from "@/services/allotment.service";
 import { listMembers, type Membership } from "@/services/household.service";
-import { lastUsedCategoryId } from "@/services/transaction.service";
+import { lastUsedAllotmentId } from "@/services/transaction.service";
 
 /** Everything the Add Expense sheet needs, loaded in parallel. */
 export async function loadAddExpenseProps(
   user: PublicUser,
   membership: Membership,
 ): Promise<ComponentProps<typeof AddExpense>> {
-  const [categories, members, lastCategory] = await Promise.all([
-    listCategories(user.id),
+  const [allotments, members, lastAllotment] = await Promise.all([
+    listAllotments(user.id),
     listMembers(user.id),
-    lastUsedCategoryId(user.id),
+    lastUsedAllotmentId(user.id),
   ]);
   return {
-    categories: categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon })),
+    allotments: allotments.map((a) => ({ id: a.id, name: a.name })),
     members: members.map((m) => ({ id: m.id, name: m.name })),
     currentUserId: user.id,
-    defaultCategoryId: lastCategory ?? undefined,
+    defaultAllotmentId: lastAllotment ?? undefined,
     today: todayInTimeZone(membership.household.timezone),
     currency: membership.household.currency,
   };

@@ -2,7 +2,7 @@ import { Types } from "mongoose";
 import { dbConnect } from "@/lib/db";
 import { AppError, ForbiddenError, isDuplicateKeyError } from "@/lib/errors";
 import { createHouseholdSchema, fieldErrorsOf, householdSettingsSchema } from "@/lib/validation";
-import { Category } from "@/models/Category";
+import { Allotment } from "@/models/Allotment";
 import { Household, type HouseholdDoc, type HouseholdRole } from "@/models/Household";
 import { User } from "@/models/User";
 
@@ -64,20 +64,21 @@ export async function requireOwner(userId: string): Promise<Membership> {
   return membership;
 }
 
-export function defaultCategories(ownerName: string) {
+/** Suggested starting allotments, offered when a household is created. */
+export function defaultAllotments(ownerName: string): string[] {
   const firstName = ownerName.trim().split(/\s+/)[0] || "Me";
   return [
-    { name: "Household", icon: "🏠", type: "EXPENSE" },
-    { name: "Food & Groceries", icon: "🛒", type: "EXPENSE" },
-    { name: "Transport", icon: "🚗", type: "EXPENSE" },
-    { name: "Bills", icon: "💡", type: "EXPENSE" },
-    { name: `Personal - ${firstName}`, icon: "🙂", type: "EXPENSE" },
-    { name: "Personal - Spouse", icon: "🙂", type: "EXPENSE" },
-    { name: "Entertainment", icon: "🎬", type: "EXPENSE" },
-    { name: "Medical", icon: "🩺", type: "EXPENSE" },
-    { name: "Savings", icon: "🏦", type: "SAVING" },
-    { name: "Miscellaneous", icon: "📦", type: "EXPENSE" },
-  ] as const;
+    "Household",
+    "Food & Groceries",
+    "Transport",
+    "Bills",
+    `Personal - ${firstName}`,
+    "Personal - Spouse",
+    "Entertainment",
+    "Medical",
+    "Savings",
+    "Miscellaneous",
+  ];
 }
 
 export async function createHousehold(userId: string, input: unknown): Promise<HouseholdInfo> {
@@ -102,9 +103,9 @@ export async function createHousehold(userId: string, input: unknown): Promise<H
     throw err;
   }
 
-  if (parsed.data.useDefaultCategories) {
-    await Category.insertMany(
-      defaultCategories(user.name).map((c, i) => ({ ...c, householdId: household._id, sortOrder: i })),
+  if (parsed.data.useDefaultAllotments) {
+    await Allotment.insertMany(
+      defaultAllotments(user.name).map((name, i) => ({ name, householdId: household._id, sortOrder: i })),
     );
   }
 

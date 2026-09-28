@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeCategory, summarizeMonth } from "@/lib/budget-math";
+import { summarizeAllotment, summarizeMonth } from "@/lib/budget-math";
 import {
   addDays,
   formatDateLabel,
@@ -65,34 +65,35 @@ describe("dates", () => {
 
 describe("budget math", () => {
   it("handles zero expenses", () => {
-    expect(summarizeCategory(40000, 0)).toMatchObject({ remaining: 40000, overBy: 0, status: "ok", percentUsed: 0 });
+    expect(summarizeAllotment(40000, 0)).toMatchObject({ remaining: 40000, overBy: 0, status: "ok", percentUsed: 0 });
   });
 
   it("handles one expense", () => {
-    expect(summarizeCategory(40000, 2500)).toMatchObject({ spent: 2500, remaining: 37500, status: "ok" });
+    expect(summarizeAllotment(40000, 2500)).toMatchObject({ spent: 2500, remaining: 37500, status: "ok" });
   });
 
   it("flags spending equal to allocation as full", () => {
-    expect(summarizeCategory(40000, 40000)).toMatchObject({ remaining: 0, status: "full", percentUsed: 100 });
+    expect(summarizeAllotment(40000, 40000)).toMatchObject({ remaining: 0, status: "full", percentUsed: 100 });
   });
 
   it("flags overspending without hiding it", () => {
-    expect(summarizeCategory(40000, 43000)).toMatchObject({ remaining: -3000, overBy: 3000, status: "over" });
-    expect(summarizeCategory(0, 500)).toMatchObject({ remaining: -500, overBy: 500, status: "over" });
+    expect(summarizeAllotment(40000, 43000)).toMatchObject({ remaining: -3000, overBy: 3000, status: "over" });
+    expect(summarizeAllotment(0, 500)).toMatchObject({ remaining: -500, overBy: 500, status: "over" });
   });
 
   it("flags low balance", () => {
-    expect(summarizeCategory(10000, 9000).status).toBe("low");
+    expect(summarizeAllotment(10000, 9000).status).toBe("low");
   });
 
-  it("computes monthly totals", () => {
-    expect(summarizeMonth(300000, [70000, 40000, 190000], [12500, 18800, 61150])).toEqual({
-      income: 300000,
-      allocated: 300000,
-      spent: 92450,
-      unallocated: 0,
-      remaining: 207550,
+  it("computes money in, money out and allotted totals", () => {
+    expect(summarizeMonth([250000, 50000], [70000, 40000, 190000], [12500, 18800, 61150])).toEqual({
+      moneyIn: 300000,
+      moneyOut: 92450,
+      balance: 207550,
+      allotted: 300000,
+      unallotted: 0,
     });
-    expect(summarizeMonth(100000, [120000], []).unallocated).toBe(-20000);
+    expect(summarizeMonth([100000], [120000], []).unallotted).toBe(-20000);
+    expect(summarizeMonth([], [], [500])).toMatchObject({ moneyIn: 0, moneyOut: 500, balance: -500 });
   });
 });

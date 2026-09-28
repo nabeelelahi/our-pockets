@@ -3,12 +3,12 @@
 import { Field, fieldAria } from "@/components/ui/Field";
 import { inputClass } from "@/components/ui/styles";
 
-export type CategoryOption = { id: string; name: string; icon: string; isArchived?: boolean };
+export type AllotmentOption = { id: string; name: string; isArchived?: boolean };
 export type MemberOption = { id: string; name: string };
 
 export type TransactionDefaults = {
   amount?: number;
-  categoryId?: string;
+  allotmentId?: string;
   description?: string;
   paidByUserId: string;
   transactionDate: string;
@@ -16,7 +16,7 @@ export type TransactionDefaults = {
 
 export function TransactionFields({
   idPrefix,
-  categories,
+  allotments,
   members,
   defaults,
   currency,
@@ -24,7 +24,7 @@ export function TransactionFields({
   autoFocusAmount,
 }: {
   idPrefix: string;
-  categories: CategoryOption[];
+  allotments: AllotmentOption[];
   members: MemberOption[];
   defaults: TransactionDefaults;
   currency: string;
@@ -50,22 +50,21 @@ export function TransactionFields({
         />
       </Field>
 
-      <Field id={id("category")} label="Category" error={fieldErrors.categoryId}>
+      <Field id={id("allotment")} label="From allotment" error={fieldErrors.allotmentId}>
         <select
-          {...fieldAria(id("category"), fieldErrors.categoryId)}
-          name="categoryId"
-          defaultValue={defaults.categoryId ?? ""}
+          {...fieldAria(id("allotment"), fieldErrors.allotmentId)}
+          name="allotmentId"
+          defaultValue={defaults.allotmentId ?? ""}
           required
           className={inputClass}
         >
           <option value="" disabled>
-            Choose a category
+            Choose an allotment
           </option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.icon ? `${c.icon} ` : ""}
-              {c.name}
-              {c.isArchived ? " (archived)" : ""}
+          {allotments.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+              {a.isArchived ? " (archived)" : ""}
             </option>
           ))}
         </select>

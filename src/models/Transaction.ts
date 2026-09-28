@@ -6,7 +6,7 @@ const transactionSchema = new Schema(
   {
     householdId: { type: Schema.Types.ObjectId, ref: "Household", required: true },
     budgetId: { type: Schema.Types.ObjectId, ref: "Budget", required: true },
-    categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
+    allotmentId: { type: Schema.Types.ObjectId, ref: "Allotment", required: true },
     amount: { ...wholeAmountField, min: 1 },
     description: { type: String, trim: true, maxlength: 140, default: "" },
     paidByUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -18,7 +18,7 @@ const transactionSchema = new Schema(
 
 transactionSchema.index({ householdId: 1, budgetId: 1 });
 transactionSchema.index({ householdId: 1, transactionDate: -1, createdAt: -1 });
-transactionSchema.index({ categoryId: 1 });
+transactionSchema.index({ allotmentId: 1 });
 
 export type TransactionDoc = InferSchemaType<typeof transactionSchema> & { _id: Types.ObjectId };
 

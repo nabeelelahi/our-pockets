@@ -7,42 +7,43 @@ import { CloseIcon, PlusIcon } from "@/components/ui/icons";
 import { buttonClass } from "@/components/ui/styles";
 import { useServerForm } from "@/components/ui/useServerForm";
 import { formatMoney } from "@/lib/money";
-import { TransactionFields, type CategoryOption, type MemberOption } from "./TransactionFields";
+import { TransactionFields, type AllotmentOption, type MemberOption } from "./TransactionFields";
 
 type Toast = { text: string; over: boolean };
 
 export function AddExpense({
-  categories,
+  allotments,
   members,
   currentUserId,
-  defaultCategoryId,
+  defaultAllotmentId,
   today,
   currency,
 }: {
-  categories: CategoryOption[];
+  allotments: AllotmentOption[];
   members: MemberOption[];
   currentUserId: string;
-  defaultCategoryId?: string;
+  /** Last-used allotment, or the allotment page being viewed. */
+  defaultAllotmentId?: string;
   today: string;
   currency: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Remounting the form (new key) resets every field to its defaults.
   const [formKey, setFormKey] = useState(0);
-  const [lastCategoryId, setLastCategoryId] = useState(defaultCategoryId);
+  const [lastAllotmentId, setLastAllotmentId] = useState(defaultAllotmentId);
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const { result, setResult, pending, onSubmit, fieldErrors } = useServerForm(createTransactionAction, {
     onSuccess: (res, form) => {
-      const { category, categoryName } = res.data;
-      setLastCategoryId(String(new FormData(form).get("categoryId")));
+      const { allotment, allotmentName } = res.data;
+      setLastAllotmentId(String(new FormData(form).get("allotmentId")));
       setToast({
-        over: category.remaining < 0,
+        over: allotment.remaining < 0,
         text:
-          category.remaining < 0
-            ? `Saved. ${categoryName} is over budget by ${formatMoney(category.overBy, currency)}.`
-            : `Saved. You now have ${formatMoney(category.remaining, currency)} left for ${categoryName}.`,
+          allotment.remaining < 0
+            ? `Saved. ${allotmentName} is over by ${formatMoney(allotment.overBy, currency)}.`
+            : `Saved. You now have ${formatMoney(allotment.remaining, currency)} left in ${allotmentName}.`,
       });
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 5000);
@@ -65,7 +66,7 @@ export function AddExpense({
     dialogRef.current?.close();
   }
 
-  const disabled = categories.length === 0;
+  const disabled = allotments.length === 0;
 
   return (
     <>
@@ -73,7 +74,7 @@ export function AddExpense({
         type="button"
         onClick={show}
         disabled={disabled}
-        title={disabled ? "Create a category first" : undefined}
+        title={disabled ? "Create an allotment first" : undefined}
         className={buttonClass(
           "primary",
           "fixed right-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-40 h-14 rounded-full px-5 shadow-lg md:static md:h-11 md:rounded-xl md:shadow-none",
@@ -112,12 +113,12 @@ export function AddExpense({
             {result && !result.ok && <Alert>{result.error}</Alert>}
             <TransactionFields
               idPrefix="add"
-              categories={categories}
+              allotments={allotments}
               members={members}
               currency={currency}
               fieldErrors={fieldErrors}
               defaults={{
-                categoryId: categories.some((c) => c.id === lastCategoryId) ? lastCategoryId : undefined,
+                allotmentId: allotments.some((a) => a.id === lastAllotmentId) ? lastAllotmentId : undefined,
                 paidByUserId: currentUserId,
                 transactionDate: today,
               }}

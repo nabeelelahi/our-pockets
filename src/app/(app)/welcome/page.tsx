@@ -23,7 +23,7 @@ export default async function WelcomePage() {
 
       <section className={`${cardClass} space-y-3 p-5`}>
         <p className="text-xs font-semibold tracking-wide text-muted uppercase">Step 2</p>
-        <p className="font-medium">Set your monthly income and allocate it to categories.</p>
+        <p className="font-medium">Record the money coming in and split it into allotments.</p>
         <Link href="/budget" className={buttonClass("primary", "w-full")}>
           Set up this month&apos;s budget
         </Link>

@@ -9,7 +9,7 @@ import { currentMonthInTimeZone, isValidDate, monthOf, todayInTimeZone } from "@
 import { formatMoney, sumAmounts } from "@/lib/money";
 import { resolveMonth } from "@/lib/month-param";
 import { loadAddExpenseProps } from "@/lib/page-data";
-import { listCategories } from "@/services/category.service";
+import { listAllotments } from "@/services/allotment.service";
 import { listTransactions, TRANSACTION_LIST_LIMIT } from "@/services/transaction.service";
 
 export const metadata: Metadata = { title: "Transactions" };
@@ -24,15 +24,15 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
   const month = resolveMonth(sp.m, tz);
   const date = str(sp.date);
   const filters = {
-    categoryId: asId(str(sp.category)),
+    allotmentId: asId(str(sp.allotment)),
     paidByUserId: asId(str(sp.person)),
     date: date && isValidDate(date) && monthOf(date) === month ? date : undefined,
     q: str(sp.q)?.slice(0, 100),
   };
 
-  const [transactions, categories, addExpense] = await Promise.all([
+  const [transactions, allotments, addExpense] = await Promise.all([
     listTransactions(user.id, { month, ...filters }),
-    listCategories(user.id, { includeArchived: true }),
+    listAllotments(user.id, { includeArchived: true }),
     loadAddExpenseProps(user, membership),
   ]);
   const currency = membership.household.currency;
@@ -46,7 +46,7 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
             month={month}
             basePath="/transactions"
             currentMonth={currentMonthInTimeZone(tz)}
-            params={{ category: filters.categoryId, person: filters.paidByUserId, q: filters.q }}
+            params={{ allotment: filters.allotmentId, person: filters.paidByUserId, q: filters.q }}
           />
         </div>
         <AddExpense {...addExpense} />
@@ -65,15 +65,15 @@ export default async function TransactionsPage(props: PageProps<"/transactions">
           defaultValue={filters.q}
           className={`${inputClass} lg:col-span-2`}
         />
-        <label className="sr-only" htmlFor="f-category">
-          Category
+        <label className="sr-only" htmlFor="f-allotment">
+          Allotment
         </label>
-        <select id="f-category" name="category" defaultValue={filters.categoryId ?? ""} className={inputClass}>
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {c.isArchived ? " (archived)" : ""}
+        <select id="f-allotment" name="allotment" defaultValue={filters.allotmentId ?? ""} className={inputClass}>
+          <option value="">All allotments</option>
+          {allotments.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+              {a.isArchived ? " (archived)" : ""}
             </option>
           ))}
         </select>

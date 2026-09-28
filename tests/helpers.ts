@@ -1,7 +1,7 @@
 import { registerUser } from "@/services/auth.service";
+import { createAllotment } from "@/services/allotment.service";
 import { createHousehold } from "@/services/household.service";
 import { acceptInvitation, createInvitation } from "@/services/invitation.service";
-import { createCategory } from "@/services/category.service";
 
 let counter = 0;
 
@@ -15,14 +15,14 @@ export async function makeUser(name = "User") {
   });
 }
 
-/** A household with an owner, an accepted spouse and one "Food" category. */
+/** A household with an owner, an accepted spouse and two allotments: "Food" and "Household". */
 export async function makeHousehold(label = "A") {
   const owner = await makeUser(`Owner${label}`);
-  await createHousehold(owner.id, { name: `Household ${label}`, useDefaultCategories: false });
+  await createHousehold(owner.id, { name: `Household ${label}`, useDefaultAllotments: false });
   const spouse = await makeUser(`Spouse${label}`);
   const { token } = await createInvitation(owner.id);
   await acceptInvitation(spouse.id, token);
-  const food = await createCategory(owner.id, { name: "Food", type: "EXPENSE", icon: "" });
-  const household = await createCategory(owner.id, { name: "Household", type: "EXPENSE", icon: "" });
+  const food = await createAllotment(owner.id, { name: "Food" });
+  const household = await createAllotment(owner.id, { name: "Household" });
   return { owner, spouse, food, household };
 }

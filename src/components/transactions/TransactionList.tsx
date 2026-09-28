@@ -8,10 +8,13 @@ export function TransactionList({
   transactions,
   currency,
   today,
+  hideAllotment = false,
 }: {
   transactions: TransactionView[];
   currency: string;
   today: string;
+  /** On an allotment's own page the allotment name is redundant. */
+  hideAllotment?: boolean;
 }) {
   // Already sorted newest first; group consecutive items by date.
   const groups: { date: string; items: TransactionView[] }[] = [];
@@ -42,14 +45,14 @@ export function TransactionList({
                   >
                     <span
                       aria-hidden="true"
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card-muted text-lg"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-soft font-semibold text-accent"
                     >
-                      {t.categoryIcon || "•"}
+                      {t.allotmentName.charAt(0).toUpperCase()}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{t.description || t.categoryName}</span>
+                      <span className="block truncate font-medium">{t.description || t.allotmentName}</span>
                       <span className="block truncate text-sm text-muted">
-                        {t.categoryName} · {t.paidByName}
+                        {hideAllotment ? t.paidByName : `${t.allotmentName} · ${t.paidByName}`}
                       </span>
                     </span>
                     <span className="tabular shrink-0 font-semibold">{formatMoney(t.amount, currency)}</span>

@@ -6,27 +6,23 @@ import { requireUserId } from "@/lib/auth/session";
 import { formatMonthLabel } from "@/lib/dates";
 import { copyPreviousBudget, saveBudget, type CopiedBudget } from "@/services/budget.service";
 
-/** Allocation inputs are named "alloc:<categoryId>". */
+/** Allotted-amount inputs are named "alloc:<allotmentId>". */
 export async function saveBudgetAction(formData: FormData): Promise<ActionResult> {
   return runAction(async () => {
-    const allocations: { categoryId: string; allocatedAmount: string }[] = [];
+    const allocations: { allotmentId: string; allocatedAmount: string }[] = [];
     for (const [key, value] of formData.entries()) {
       if (key.startsWith("alloc:") && typeof value === "string") {
-        allocations.push({ categoryId: key.slice("alloc:".length), allocatedAmount: value });
+        allocations.push({ allotmentId: key.slice("alloc:".length), allocatedAmount: value });
       }
     }
-    await saveBudget(await requireUserId(), {
-      month: formString(formData, "month"),
-      totalIncome: formString(formData, "totalIncome"),
-      allocations,
-    });
+    await saveBudget(await requireUserId(), { month: formString(formData, "month"), allocations });
     revalidatePath("/", "layout");
-  }, "Budget saved.");
+  }, "Allotments saved.");
 }
 
 export async function copyPreviousBudgetAction(month: string): Promise<ActionResult<CopiedBudget>> {
   const result = await runAction(async () => copyPreviousBudget(await requireUserId(), month));
   if (!result.ok) return result;
   revalidatePath("/", "layout");
-  return { ...result, message: `Copied from ${formatMonthLabel(result.data.fromMonth)}.` };
+  return { ...result, message: `Copied allotments from ${formatMonthLabel(result.data.fromMonth)}.` };
 }

@@ -14,7 +14,7 @@ export async function createHouseholdAction(formData: FormData): Promise<ActionR
   return runAction(async () => {
     await createHousehold(await requireUserId(), {
       name: formString(formData, "name"),
-      useDefaultCategories: formData.get("useDefaultCategories") === "on",
+      useDefaultAllotments: formData.get("useDefaultAllotments") === "on",
     });
     revalidatePath("/", "layout");
     return { redirectTo: "/welcome" };

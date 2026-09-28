@@ -1,14 +1,14 @@
-import type { CategoryStatus } from "@/lib/budget-math";
+import type { AllotmentStatus } from "@/lib/budget-math";
 import { cn } from "@/components/ui/styles";
 
-const BAR: Record<CategoryStatus, string> = {
+const BAR: Record<AllotmentStatus, string> = {
   ok: "bg-accent",
   low: "bg-warn",
   full: "bg-warn",
   over: "bg-danger",
 };
 
-export function ProgressBar({ percent, status, label }: { percent: number; status: CategoryStatus; label: string }) {
+export function ProgressBar({ percent, status, label }: { percent: number; status: AllotmentStatus; label: string }) {
   return (
     <div
       role="progressbar"

@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import type { CategorySummary } from "@/lib/budget-math";
+import type { AllotmentSummary } from "@/lib/budget-math";
 import { monthDateRange, monthOf } from "@/lib/dates";
 import { AppError, NotFoundError } from "@/lib/errors";
 import {
@@ -9,10 +9,10 @@ import {
   type TransactionFilters,
   type TransactionInput,
 } from "@/lib/validation";
-import { Category } from "@/models/Category";
+import { Allotment } from "@/models/Allotment";
 import { Transaction, type TransactionDoc } from "@/models/Transaction";
 import { User } from "@/models/User";
-import { ensureBudget, getCategorySummary } from "./budget.service";
+import { ensureBudget, getAllotmentSummary } from "./budget.service";
 import { requireMembership, type Membership } from "./household.service";
 
 export type TransactionView = {
@@ -20,9 +20,8 @@ export type TransactionView = {
   amount: number;
   description: string;
   transactionDate: string;
-  categoryId: string;
-  categoryName: string;
-  categoryIcon: string;
+  allotmentId: string;
+  allotmentName: string;
   paidByUserId: string;
   paidByName: string;
 };
@@ -43,17 +42,18 @@ async function findOwnTransaction(householdId: Types.ObjectId, transactionId: st
   return tx;
 }
 
-async function assertCategory(
-  membership: Membership,
-  categoryId: string,
-  opts: { allowArchived: boolean },
-) {
-  const category = await Category.findOne({ _id: categoryId, householdId: membership.householdId }).lean();
-  if (!category) throw new AppError("This category no longer exists.", { categoryId: ["This category no longer exists."] });
-  if (category.isArchived && !opts.allowArchived) {
-    throw new AppError("This category is archived. Choose another one.", { categoryId: ["This category is archived."] });
+async function assertAllotment(membership: Membership, allotmentId: string, opts: { allowArchived: boolean }) {
+  const allotment = await Allotment.findOne({ _id: allotmentId, householdId: membership.householdId }).lean();
+  if (!allotment) {
+    const message = "This allotment no longer exists.";
+    throw new AppError(message, { allotmentId: [message] });
   }
-  return category;
+  if (allotment.isArchived && !opts.allowArchived) {
+    throw new AppError("This allotment is archived. Choose another one.", {
+      allotmentId: ["This allotment is archived."],
+    });
+  }
+  return allotment;
 }
 
 function assertPayer(membership: Membership, paidByUserId: string, previousPayer?: string) {
@@ -65,15 +65,15 @@ function assertPayer(membership: Membership, paidByUserId: string, previousPayer
 
 export type SavedTransaction = {
   id: string;
-  categoryName: string;
+  allotmentName: string;
   month: string;
-  category: CategorySummary;
+  allotment: AllotmentSummary;
 };
 
 export async function createTransaction(userId: string, input: TransactionInput): Promise<SavedTransaction> {
   const membership = await requireMembership(userId);
   const data = parseTransaction(input);
-  const category = await assertCategory(membership, data.categoryId, { allowArchived: false });
+  const allotment = await assertAllotment(membership, data.allotmentId, { allowArchived: false });
   assertPayer(membership, data.paidByUserId);
 
   const month = monthOf(data.transactionDate);
@@ -81,7 +81,7 @@ export async function createTransaction(userId: string, input: TransactionInput)
   const tx = await Transaction.create({
     householdId: membership.householdId,
     budgetId: budget._id,
-    categoryId: category._id,
+    allotmentId: allotment._id,
     amount: data.amount,
     description: data.description,
     paidByUserId: data.paidByUserId,
@@ -90,9 +90,9 @@ export async function createTransaction(userId: string, input: TransactionInput)
 
   return {
     id: tx._id.toString(),
-    categoryName: category.name,
+    allotmentName: allotment.name,
     month,
-    category: await getCategorySummary(membership.householdId, budget._id, category._id),
+    allotment: await getAllotmentSummary(membership.householdId, budget._id, allotment._id),
   };
 }
 
@@ -104,9 +104,9 @@ export async function updateTransaction(
   const membership = await requireMembership(userId);
   const tx = await findOwnTransaction(membership.householdId, transactionId);
   const data = parseTransaction(input);
-  const category = await assertCategory(membership, data.categoryId, {
-    // Keeping an expense in its (now archived) category is fine; moving into one isn't.
-    allowArchived: tx.categoryId.toString() === data.categoryId,
+  const allotment = await assertAllotment(membership, data.allotmentId, {
+    // Keeping an expense in its (now archived) allotment is fine; moving into one isn't.
+    allowArchived: tx.allotmentId.toString() === data.allotmentId,
   });
   assertPayer(membership, data.paidByUserId, tx.paidByUserId.toString());
 
@@ -115,7 +115,7 @@ export async function updateTransaction(
   const budget = await ensureBudget(membership.householdId, month);
   tx.set({
     budgetId: budget._id,
-    categoryId: category._id,
+    allotmentId: allotment._id,
     amount: data.amount,
     description: data.description,
     paidByUserId: data.paidByUserId,
@@ -125,9 +125,9 @@ export async function updateTransaction(
 
   return {
     id: tx._id.toString(),
-    categoryName: category.name,
+    allotmentName: allotment.name,
     month,
-    category: await getCategorySummary(membership.householdId, budget._id, category._id),
+    allotment: await getAllotmentSummary(membership.householdId, budget._id, allotment._id),
   };
 }
 
@@ -139,29 +139,25 @@ export async function deleteTransaction(userId: string, transactionId: string): 
 }
 
 async function toViews(docs: TransactionDoc[]): Promise<TransactionView[]> {
-  const categoryIds = [...new Set(docs.map((d) => d.categoryId.toString()))];
+  const allotmentIds = [...new Set(docs.map((d) => d.allotmentId.toString()))];
   const userIds = [...new Set(docs.map((d) => d.paidByUserId.toString()))];
-  const [categories, users] = await Promise.all([
-    Category.find({ _id: { $in: categoryIds } }).lean(),
+  const [allotments, users] = await Promise.all([
+    Allotment.find({ _id: { $in: allotmentIds } }).select("name").lean(),
     User.find({ _id: { $in: userIds } }).select("name").lean(),
   ]);
-  const categoryById = new Map(categories.map((c) => [c._id.toString(), c]));
-  const userById = new Map(users.map((u) => [u._id.toString(), u.name]));
+  const allotmentNames = new Map(allotments.map((a) => [a._id.toString(), a.name]));
+  const userNames = new Map(users.map((u) => [u._id.toString(), u.name]));
 
-  return docs.map((d) => {
-    const category = categoryById.get(d.categoryId.toString());
-    return {
-      id: d._id.toString(),
-      amount: d.amount,
-      description: d.description ?? "",
-      transactionDate: d.transactionDate,
-      categoryId: d.categoryId.toString(),
-      categoryName: category?.name ?? "Deleted category",
-      categoryIcon: category?.icon ?? "",
-      paidByUserId: d.paidByUserId.toString(),
-      paidByName: userById.get(d.paidByUserId.toString()) ?? "Former member",
-    };
-  });
+  return docs.map((d) => ({
+    id: d._id.toString(),
+    amount: d.amount,
+    description: d.description ?? "",
+    transactionDate: d.transactionDate,
+    allotmentId: d.allotmentId.toString(),
+    allotmentName: allotmentNames.get(d.allotmentId.toString()) ?? "Deleted allotment",
+    paidByUserId: d.paidByUserId.toString(),
+    paidByName: userNames.get(d.paidByUserId.toString()) ?? "Former member",
+  }));
 }
 
 export async function getTransaction(userId: string, transactionId: string): Promise<TransactionView> {
@@ -177,14 +173,14 @@ export async function listTransactions(userId: string, filters: TransactionFilte
   const { householdId } = await requireMembership(userId);
   const parsed = transactionFiltersSchema.safeParse(filters);
   if (!parsed.success) throw new AppError("Invalid filters.");
-  const { month, categoryId, paidByUserId, date, q } = parsed.data;
+  const { month, allotmentId, paidByUserId, date, q } = parsed.data;
   const range = monthDateRange(month);
 
   const query: Record<string, unknown> = {
     householdId,
     transactionDate: date && monthOf(date) === month ? date : { $gte: range.start, $lte: range.end },
   };
-  if (categoryId) query.categoryId = new Types.ObjectId(categoryId);
+  if (allotmentId) query.allotmentId = new Types.ObjectId(allotmentId);
   if (paidByUserId) query.paidByUserId = new Types.ObjectId(paidByUserId);
   if (q) query.description = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
 
@@ -195,12 +191,12 @@ export async function listTransactions(userId: string, filters: TransactionFilte
   return toViews(docs);
 }
 
-/** The category of the user's most recent expense, used as the Add Expense default. */
-export async function lastUsedCategoryId(userId: string): Promise<string | null> {
+/** The allotment of the user's most recent expense, used as the Add Expense default. */
+export async function lastUsedAllotmentId(userId: string): Promise<string | null> {
   const { householdId } = await requireMembership(userId);
   const last = await Transaction.findOne({ householdId, paidByUserId: userId })
     .sort({ createdAt: -1 })
-    .select("categoryId")
+    .select("allotmentId")
     .lean();
-  return last?.categoryId.toString() ?? null;
+  return last?.allotmentId.toString() ?? null;
 }

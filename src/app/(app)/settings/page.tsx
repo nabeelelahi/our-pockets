@@ -65,8 +65,8 @@ export default async function SettingsPage() {
         )}
       </Section>
 
-      <Link href="/settings/categories" className={`${cardClass} flex min-h-14 items-center justify-between p-5 font-semibold hover:bg-card-muted`}>
-        Categories
+      <Link href="/settings/allotments" className={`${cardClass} flex min-h-14 items-center justify-between p-5 font-semibold hover:bg-card-muted`}>
+        Allotments
         <ChevronRightIcon />
       </Link>
 

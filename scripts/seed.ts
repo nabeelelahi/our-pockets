@@ -24,7 +24,8 @@ async function main() {
   const { dbConnect } = await import("@/lib/db");
   const { User } = await import("@/models/User");
   const { Household } = await import("@/models/Household");
-  const { Category } = await import("@/models/Category");
+  const { Allotment } = await import("@/models/Allotment");
+  const { Income } = await import("@/models/Income");
   const { Budget } = await import("@/models/Budget");
   const { BudgetAllocation } = await import("@/models/BudgetAllocation");
   const { Transaction } = await import("@/models/Transaction");
@@ -32,7 +33,8 @@ async function main() {
   const { registerUser } = await import("@/services/auth.service");
   const { createHousehold } = await import("@/services/household.service");
   const { acceptInvitation, createInvitation } = await import("@/services/invitation.service");
-  const { createCategory } = await import("@/services/category.service");
+  const { createAllotment } = await import("@/services/allotment.service");
+  const { createIncome } = await import("@/services/income.service");
   const { saveBudget } = await import("@/services/budget.service");
   const { createTransaction } = await import("@/services/transaction.service");
 
@@ -48,7 +50,8 @@ async function main() {
     Transaction.deleteMany({ householdId: { $in: householdIds } }),
     BudgetAllocation.deleteMany({ householdId: { $in: householdIds } }),
     Budget.deleteMany({ householdId: { $in: householdIds } }),
-    Category.deleteMany({ householdId: { $in: householdIds } }),
+    Allotment.deleteMany({ householdId: { $in: householdIds } }),
+    Income.deleteMany({ householdId: { $in: householdIds } }),
     Invitation.deleteMany({ householdId: { $in: householdIds } }),
   ]);
   await Household.deleteMany({ _id: { $in: householdIds } });
@@ -59,30 +62,42 @@ async function main() {
   const nabeel = await reg("Nabeel", emails[0]);
   const wife = await reg("Wife", emails[1]);
 
-  await createHousehold(nabeel.id, { name: "Nabeel & Wife", useDefaultCategories: false });
+  await createHousehold(nabeel.id, { name: "Nabeel & Wife", useDefaultAllotments: false });
   const { token } = await createInvitation(nabeel.id);
   await acceptInvitation(wife.id, token);
 
   const plan = [
-    ["Household", "🏠", 70000],
-    ["Food & Groceries", "🛒", 40000],
-    ["Transport", "🚗", 25000],
-    ["Bills", "💡", 30000],
-    ["Personal - Nabeel", "🙂", 15000],
-    ["Personal - Wife", "🙂", 15000],
-    ["Savings", "🏦", 100000],
-    ["Miscellaneous", "📦", 5000],
+    ["Household", 70000],
+    ["Food & Groceries", 40000],
+    ["Transport", 25000],
+    ["Bills", 30000],
+    ["Personal - Nabeel", 15000],
+    ["Personal - Wife", 15000],
+    ["Savings", 100000],
+    ["Miscellaneous", 5000],
   ] as const;
   const ids: Record<string, string> = {};
-  for (const [name, icon] of plan) {
-    const c = await createCategory(nabeel.id, { name, icon, type: name === "Savings" ? "SAVING" : "EXPENSE" });
-    ids[name] = c.id;
+  for (const [name] of plan) {
+    ids[name] = (await createAllotment(nabeel.id, { name })).id;
   }
+
+  // Money in: PKR 300,000 across two entries.
+  await createIncome(nabeel.id, {
+    amount: 250000,
+    source: "Salary",
+    receivedByUserId: nabeel.id,
+    receivedDate: "2026-09-01",
+  });
+  await createIncome(nabeel.id, {
+    amount: 50000,
+    source: "Freelance",
+    receivedByUserId: wife.id,
+    receivedDate: "2026-09-10",
+  });
 
   await saveBudget(nabeel.id, {
     month: MONTH,
-    totalIncome: 300000,
-    allocations: plan.map(([name, , amount]) => ({ categoryId: ids[name], allocatedAmount: amount })),
+    allocations: plan.map(([name, amount]) => ({ allotmentId: ids[name], allocatedAmount: amount })),
   });
 
   const expenses: [number, string, string, typeof nabeel, string][] = [
@@ -95,11 +110,11 @@ async function main() {
     [1500, "Snacks", "Food & Groceries", wife, "2026-09-26"],
     [4200, "Books", "Personal - Nabeel", nabeel, "2026-09-27"],
   ];
-  for (const [amount, description, category, who, date] of expenses) {
+  for (const [amount, description, allotment, who, date] of expenses) {
     await createTransaction(nabeel.id, {
       amount,
       description,
-      categoryId: ids[category],
+      allotmentId: ids[allotment],
       paidByUserId: who.id,
       transactionDate: date,
     });

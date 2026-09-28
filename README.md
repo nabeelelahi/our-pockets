@@ -1,9 +1,10 @@
 # Our Pockets — shared household budget
 
-A mobile-first budgeting PWA for two spouses. Set a monthly income, split it into
-categories (envelopes), record expenses, and both of you see the same balances.
+A mobile-first budgeting PWA for two spouses. Record the money coming in, split it into
+**allotments** (e.g. "Groceries: PKR 40,000"), record each expense against an allotment, and both of
+you see the same money in, money out and what's left in every allotment.
 
-> "I spent PKR 2,500 on Food" → "Saved. You now have PKR 37,500 left for Food & Groceries."
+> "I spent PKR 2,500 on Food" → "Saved. You now have PKR 37,500 left in Food & Groceries."
 
 Runs at **$0/month** on the Vercel Hobby tier and a MongoDB Atlas M0 (free) cluster.
 There's no email provider, bank integration or paid API.
@@ -36,13 +37,17 @@ public/              service worker + offline page
 
 - **Money is integers.** Whole currency units (PKR 2,500 → `2500`). Input like `2.5`, `-10` or `2500abc` is rejected on the server.
 - **Dates are calendar strings.** Expenses store `transactionDate` as `YYYY-MM-DD` in the household timezone (default `Asia/Karachi`), so they never shift a day through UTC conversion. Budgets are keyed by `YYYY-MM`. The expense date decides which month's budget it belongs to.
-- **Balances are computed, not stored.** Spent amounts are aggregated from transactions, so edits, deletes and category moves are always reflected correctly.
+- **Balances are computed, not stored.** Spent amounts are aggregated from transactions, so edits, deletes and moves between allotments are always reflected correctly.
 - **Authorization lives in services.** Every service derives the household from the authenticated user id. It never trusts a client-supplied household id, and every lookup is scoped by `householdId`. Records from another household behave exactly like missing ones.
 - **Membership is embedded** in the household (`members: [{ userId, role }]`). A unique index on `members.userId` enforces one household per user, and a guarded `$push` enforces the two-member limit.
 - **Invitations** are 256-bit random tokens. Only a SHA-256 hash is stored. They expire after 7 days and are claimed atomically, so each works once. Creating a new link voids the old one.
-- **Roles:** both members manage budgets, categories and expenses. Only the owner changes household settings, invites, or removes the spouse.
+- **Roles:** both members manage income, allotments and expenses. Only the owner changes household settings, invites, or removes the spouse.
 - **Overspending is allowed and shown**, never blocked. Over-allocation shows a warning.
-- **No rollover** in the MVP. "Copy from previous month" copies income and allocations only.
+- **Money in is a list of income entries** (amount, source, date, who received it). Money in for a month is their total; money out is the total of that month's expenses; balance = money in − money out.
+- **Allotments are reusable across months.** An allotment is just a name (`allotments` collection). Each month's budget gives chosen allotments an amount (`budgetAllocations`). On the Budget page you pick allotments, or create new ones inline, and type their amounts. Saving stores exactly that list, and the dashboard shows only those allotments plus any that have spending. Renaming an allotment renames it in every month.
+- **Each allotment has its own page** (`/allotments/[id]?m=YYYY-MM`) showing allotted, spent and left, plus every expense recorded against it that month.
+- **Deleting an allotment** removes it everywhere if it has no expenses; otherwise it's archived so history stays intact.
+- **No rollover** in the MVP. "Copy from previous month" copies allotted amounts only; income entries are real receipts and are not copied.
 - **Freshness without WebSockets.** Pages are server-rendered on each request and refresh when the app returns to the foreground, so each spouse sees the other's latest expenses.
 
 ## Local development
@@ -75,7 +80,7 @@ npm run dev                   # http://localhost:3000
 npm run seed
 ```
 
-This creates the household "Nabeel & Wife" with a September 2026 budget (income PKR 300,000) and sample expenses:
+This creates the household "Nabeel & Wife" with September 2026 money in of PKR 300,000 (Salary 250,000 + Freelance 50,000), eight allotments and sample expenses:
 
 | Email | Password |
 | --- | --- |
@@ -120,7 +125,7 @@ Indexes, including the unique ones that enforce data integrity, are created auto
 
 - Register, log out, and log in again (the session cookie is `Secure`, `HttpOnly`, `SameSite=Lax`).
 - Create the household, create an invitation link, and open it on the second phone to register and accept.
-- Set the income and allocations, add an expense, check that the other phone shows it, then edit and delete it.
+- Add money in and allotments, add an expense against an allotment, check that the other phone shows it, then edit and delete it.
 
 ### 4. Install on phones
 
@@ -144,5 +149,5 @@ Note: logout clears the cookie. Because sessions are stateless JWTs, a copied to
 
 ## Not in the MVP (by design)
 
-Recurring expenses, rollover, multiple income sources, bank imports, investments, notifications,
+Recurring expenses, rollover, bank imports, investments, notifications,
 receipts, offline sync, and real-time updates. The service layer is structured so these can be added later.

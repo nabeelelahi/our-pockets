@@ -7,7 +7,7 @@ import { cardClass } from "@/components/ui/styles";
 import { requireHousehold } from "@/lib/auth/session";
 import { monthOf } from "@/lib/dates";
 import { NotFoundError } from "@/lib/errors";
-import { listCategories } from "@/services/category.service";
+import { listAllotments } from "@/services/allotment.service";
 import { listMembers } from "@/services/household.service";
 import { getTransaction, type TransactionView } from "@/services/transaction.service";
 
@@ -26,14 +26,14 @@ export default async function EditTransactionPage(props: PageProps<"/transaction
     throw err;
   }
 
-  const [categories, members] = await Promise.all([
-    listCategories(user.id, { includeArchived: true }),
+  const [allotments, members] = await Promise.all([
+    listAllotments(user.id, { includeArchived: true }),
     listMembers(user.id),
   ]);
-  // Active categories, plus the expense's own category even if archived.
-  const categoryOptions = categories
-    .filter((c) => !c.isArchived || c.id === transaction.categoryId)
-    .map((c) => ({ id: c.id, name: c.name, icon: c.icon, isArchived: c.isArchived }));
+  // Active allotments, plus the expense's own allotment even if archived.
+  const allotmentOptions = allotments
+    .filter((a) => !a.isArchived || a.id === transaction.allotmentId)
+    .map((a) => ({ id: a.id, name: a.name, isArchived: a.isArchived }));
   const memberOptions = members.map((m) => ({ id: m.id, name: m.name }));
   if (!memberOptions.some((m) => m.id === transaction.paidByUserId)) {
     memberOptions.push({ id: transaction.paidByUserId, name: transaction.paidByName });
@@ -49,7 +49,7 @@ export default async function EditTransactionPage(props: PageProps<"/transaction
         <h1 className="mb-4 text-xl font-semibold">Edit expense</h1>
         <EditTransactionForm
           transaction={transaction}
-          categories={categoryOptions}
+          allotments={allotmentOptions}
           members={memberOptions}
           currency={membership.household.currency}
         />

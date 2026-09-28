@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CategoryCard } from "@/components/dashboard/CategoryCard";
+import { AllotmentCard } from "@/components/dashboard/AllotmentCard";
 import { MonthSummary } from "@/components/dashboard/MonthSummary";
 import { MonthNav } from "@/components/layout/MonthNav";
 import { AddExpense } from "@/components/transactions/AddExpense";
@@ -20,6 +20,9 @@ export default async function DashboardPage(props: PageProps<"/">) {
     loadAddExpenseProps(user, membership),
   ]);
   const currency = overview.household.currency;
+  const budgetHref = `/budget?m=${month}`;
+  // This month's allotments, plus any with spending that weren't given an amount.
+  const rows = overview.allotments.filter((a) => a.inBudget || a.spent > 0);
   const spouseMissing = membership.memberIds.length < 2 && membership.role === "OWNER";
 
   return (
@@ -41,45 +44,46 @@ export default async function DashboardPage(props: PageProps<"/">) {
       {!overview.hasBudget ? (
         <section className={`${cardClass} p-6 text-center`}>
           <h2 className="text-lg font-semibold">Set up your {formatMonthName(month)} budget.</h2>
-          <p className="mt-1 text-muted">Enter your income and decide how much goes into each category.</p>
-          <Link href={`/budget?m=${month}`} className={buttonClass("primary", "mt-4")}>
+          <p className="mt-1 text-muted">Record the money coming in, then split it into allotments.</p>
+          <Link href={budgetHref} className={buttonClass("primary", "mt-4")}>
             Set up budget
           </Link>
         </section>
       ) : (
-        <MonthSummary totals={overview.totals} currency={currency} />
+        <>
+          <MonthSummary totals={overview.totals} currency={currency} budgetHref={budgetHref} />
+
+          <section aria-labelledby="allotments-heading" className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <h2 id="allotments-heading" className="font-semibold">
+                Allotments
+              </h2>
+              <Link href={budgetHref} className="text-sm font-medium text-accent">
+                Edit budget
+              </Link>
+            </div>
+            {rows.length === 0 ? (
+              <div className={`${cardClass} p-6 text-center`}>
+                <p className="font-medium">No allotments in your {formatMonthName(month)} budget yet.</p>
+                <Link href={budgetHref} className={buttonClass("secondary", "mt-3")}>
+                  Create allotments
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {rows.map((row) => (
+                  <AllotmentCard
+                    key={row.id}
+                    allotment={row}
+                    currency={currency}
+                    href={`/allotments/${row.id}?m=${month}`}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
-
-      <section aria-labelledby="categories-heading" className="space-y-3">
-        <div className="flex items-baseline justify-between">
-          <h2 id="categories-heading" className="font-semibold">
-            Categories
-          </h2>
-          <Link href={`/budget?m=${month}`} className="text-sm font-medium text-accent">
-            Edit budget
-          </Link>
-        </div>
-        {overview.categories.length === 0 ? (
-          <div className={`${cardClass} p-6 text-center`}>
-            <p className="font-medium">Create your first budget category.</p>
-            <Link href="/settings/categories" className={buttonClass("secondary", "mt-3")}>
-              Add categories
-            </Link>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {overview.categories.map((row) => (
-              <CategoryCard
-                key={row.id}
-                row={row}
-                currency={currency}
-                href={`/transactions?m=${month}&category=${row.id}`}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
     </div>
   );
 }
